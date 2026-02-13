@@ -321,6 +321,14 @@ For each issue:
 | DbContext in service | Service doing repository's job | Create repository for data access |
 | Data transformation in controller | Violates single responsibility | Move to service |
 
+### External API Error Handling
+| Pattern | Risk | Fix |
+|---------|------|-----|
+| `EnsureSuccessStatusCode()` only | Loses API error message, returns generic 500 | Extract error from response body before throwing |
+| `HttpRequestException` bubbles up | Client gets 500 instead of actual status code | Create typed exception with StatusCode property |
+| Controller missing API exception catch | API errors (403, 429, etc.) return as 500 | Add catch block returning `StatusCode(ex.StatusCode, ...)` |
+| Error message not logged | Can't debug API failures | Log status code, reason phrase, and response body |
+
 ### Performance
 | Pattern | Impact | Fix |
 |---------|--------|-----|

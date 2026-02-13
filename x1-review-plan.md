@@ -80,6 +80,17 @@ CHAOS DEMON ASKS:
 - What if service is down? (return fallback? fail request? timeout?)
 - What if service takes 30 seconds to respond?
 - What if service rate-limits us? (circuit breaker? queue?)
+- What if service returns 403/401? (does client see actual error or generic 500?)
+- What if error message is in response body? (is it extracted and propagated?)
+```
+
+**For Controller → Service → External API:**
+```
+CHAOS DEMON ASKS:
+- Does service throw typed exception with StatusCode? (not generic HttpRequestException)
+- Does controller catch and return StatusCode(ex.StatusCode, ...)? (not letting it bubble as 500)
+- Is error message from API response extracted? (not discarded by EnsureSuccessStatusCode)
+- Are API errors logged with status code, reason phrase, and response body?
 ```
 
 ### Review Output Style

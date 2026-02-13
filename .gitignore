@@ -1,0 +1,5 @@
+# Local file listing artifact
+nul
+
+# Claude Code local configuration
+.claude/
