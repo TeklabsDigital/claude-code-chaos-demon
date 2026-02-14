@@ -220,13 +220,27 @@ grep -n "HttpGet\|HttpPost\|HttpPut\|HttpDelete" src/*/Controllers/*Controller.c
 
 ---
 
+## Phase 6: Re-Verification Loop
+
+After gap-filling, re-run Phases 2-4 to confirm:
+1. All filled gaps are actually implemented (not just planned)
+2. No new gaps were introduced during gap-filling
+3. Final count matches: 0 ❌, 0 ⚠️
+
+**Loop until:** Zero gaps remain or user explicitly accepts remaining items.
+
+If audit was preceded by `/x1-implement`, report:
+- "Implementation gate reported N items complete. Audit confirms: [match/mismatch]"
+
+---
+
 ## Integration with X1 Workflow
 
 ```
-/x1-plan          → Create implementation plan
+/x1-plan          → Create plan with Implementation Checklist
 /x1-review-plan   → Validate plan before coding
-[implement]       → Write the code
-/x1-audit-plan    → Verify completeness ← YOU ARE HERE
+/x1-implement     → Implement with completeness tracking
+/x1-audit-plan    → Verify completeness (safety net) ← YOU ARE HERE
 /x1-code-review   → Review code quality
 /x1-git-commit    → Commit changes
 ```

@@ -4,46 +4,111 @@
 
 ## Instructions
 
-1. **Understand the goal** - What problem is being solved? Ask if unclear.
-2. **Elicit requirements** - Capture user stories and acceptance criteria
-3. **Investigate codebase** - Read relevant files, understand patterns before proposing
-4. **Present high-level plan** - Architecture approach, files to modify
-5. **Wait for acceptance** - Don't add detail until user approves direction
-6. **Add details iteratively** - Code snippets only after codebase understood
-7. **Iterate until approved** - Refine based on feedback
+1. **Discover the problem** - Spend time here. Don't rush to solutions.
+2. **Challenge and think laterally** - Be a thinking partner, not a yes-machine.
+3. **Elicit user stories** - At least one with acceptance criteria before proceeding.
+4. **Present high-level plan** - Conceptual approach, no code, no file paths.
+5. **Wait for acceptance** - Don't investigate codebase until direction approved.
+6. **Investigate codebase** - Only after high-level accepted. Find patterns, reuse.
+7. **Add detail iteratively** - Technical specifics, code snippets, Implementation Checklist.
+8. **Iterate until approved** - Refine based on feedback.
 
-**Goal:** Clear requirements, codebase-aligned plan, ready for implementation.
+**Goal:** Clear problem understanding, codebase-aligned plan with traceable Implementation Checklist, ready for `/x1-implement`.
 
 **Speed:** Work in parallel wherever possible - read multiple files simultaneously, search client and server concurrently, research while investigating code.
 
 ---
 
-## Phase 1: Requirements
+## Phase 1: Problem Discovery
 
-Ask these questions (adapt as needed):
+Spend time here. Don't rush to solutions. Understand the problem domain.
 
-### Problem & Goal
-- What problem are you solving?
-- What should the end result look like?
-- Who is the user/persona affected?
+### What problem are you solving?
+- What's the current state? What's wrong with it?
+- What's the desired state? What does success look like?
+- Who is affected? What's the impact?
 
-### Acceptance Criteria
-- How will we know when this is done?
-- What are the must-have vs nice-to-have requirements?
+### Why does this matter?
+- What happens if we don't solve this?
+- What's the cost of the current state?
+- Are there upstream/downstream effects?
 
-### Scope
-- What's explicitly OUT of scope?
-- Any constraints (time, tech, compatibility)?
+### What have you already tried or considered?
+- Previous approaches and why they didn't work
+- Constraints you've already identified
+- Related work or prior art
 
-### Context
-- Any existing specs, designs, or references?
-- Related features or code to be aware of?
+### Probe deeper — ask the questions the user hasn't thought of:
+- "You mentioned X — what happens when Y?"
+- "Who else is affected by this besides the obvious users?"
+- "What's the simplest version of this that would still be valuable?"
+- "Is there a reason this hasn't been solved before?"
+- "What would make this problem go away entirely vs just managing it?"
+
+### Challenge and think laterally
+
+**Be a critical thinking partner, not a yes-machine.**
+
+- If an idea seems over-engineered, say so: "This could work, but have you considered [simpler approach]?"
+- If the problem can be reframed, offer alternatives: "Another way to look at this is..."
+- If the user is solving a symptom, probe the root cause: "Is the real problem actually X rather than Y?"
+- Think out-of-the-box — propose approaches the user hasn't considered
+- Present trade-offs honestly: "Approach A is simpler but limits X. Approach B is more work but gives you Y."
+- If something seems like a bad idea, push back respectfully: "I'd caution against that because [reason]. Here's what I'd suggest instead."
+- If the user still wants their approach after hearing alternatives, respect that — it's their codebase
+
+**The most valuable thing in early planning is divergent thinking. Don't converge on a solution too quickly. Explore the problem space.**
+
+**DO NOT propose final solutions in this phase. Understand and challenge first.**
+
+### User Story Gate (BLOCKING)
+
+**At least one user story with acceptance criteria is REQUIRED before proceeding.**
+
+If the user hasn't provided user stories, help them formulate them:
+- "Based on what you've described, here's a user story: As a [role], I want [capability] so that [benefit]. Does this capture it?"
+- Acceptance criteria must be specific and testable
+- Each user story drives the Implementation Checklist items
+
+**DO NOT proceed to Phase 2 without at least one approved user story.**
+
+User stories are the foundation of the entire X1 workflow:
+- Plan items trace back to user stories
+- Implementation Checklist items map to acceptance criteria
+- Tests verify acceptance criteria are met
+- Audit verifies traceability end-to-end
 
 ---
 
-## Phase 2: Codebase Investigation
+## Phase 2: High-Level Plan
 
-Before proposing solutions, investigate **in parallel**:
+Present the approach at a conceptual level. No code. No file paths. Just the shape of the solution.
+
+### Problem Statement
+[1-2 sentences: what we're solving and why]
+
+### User Stories
+[List with acceptance criteria — approved in Phase 1]
+
+### Proposed Approach
+[Conceptual design — how will we solve this? What's the strategy?]
+
+### Scope
+- **In scope:** [list]
+- **Out of scope:** [list]
+
+### Key Decisions
+[Architectural choices, trade-offs, alternatives considered]
+
+**Ask:** "Does this direction feel right? Any concerns before I investigate the codebase and add detail?"
+
+**Wait for acceptance before proceeding to Phase 3.**
+
+---
+
+## Phase 3: Codebase Investigation
+
+Only after the high-level approach is accepted. Investigate **in parallel**:
 
 1. **Read CLAUDE.md** - Understand project conventions
 2. **Explore relevant code** - Client and server simultaneously
@@ -57,33 +122,14 @@ Before proposing solutions, investigate **in parallel**:
 
 ---
 
-## Phase 3: High-Level Plan
-
-Present for approval:
-
-### Problem Statement
-[1-2 sentences: what we're solving]
-
-### Proposed Approach
-[High-level architecture/design]
-
-### Files to Create/Modify
-[List with paths]
-
-### Implementation Steps
-[Ordered list, no code yet]
-
-**Ask:** "Does this approach look right before I add details?"
-
----
-
 ## Phase 4: Detailed Plan (On Acceptance)
 
-Add:
-- Technical specifics
+Add technical specifics that align with the codebase:
+- Technical design details
 - Code snippets (aligned with codebase patterns)
 - Edge cases and error handling
-- Testing approach (if applicable)
+- Testing approach
+- Implementation Checklist (IMP-NNN items)
 
 ### UI/UX Design Clarity (For Frontend Work)
 
@@ -197,6 +243,36 @@ Structure plan sections to align with what `/x1-review-plan` will validate:
 ### Testing Approach (if applicable)
 [How to verify]
 
+### Implementation Checklist
+
+Every deliverable item numbered for traceability. This is the **contract** — `/x1-implement` must satisfy every item.
+
+#### Files
+- IMP-001: Create `path/to/file.cs` — [purpose] → US-1
+- IMP-002: Modify `path/to/existing.cs` — [what changes] → US-1
+
+#### Features / Business Logic
+- IMP-003: [Feature/rule description] → US-1 AC-1
+- IMP-004: [Feature/rule description] → US-1 AC-2
+
+#### Infrastructure (DI, config, migrations)
+- IMP-005: Register `ServiceName` in DI container → US-1
+- IMP-006: Add migration for [schema change] → US-1
+
+#### Error Handling & Edge Cases
+- IMP-007: Handle [failure scenario] in [location] → US-1 AC-3
+- IMP-008: Validate [input] at [boundary] → US-2 AC-1
+
+#### Tests
+- IMP-009: Unit test — [scenario] → US-1 AC-1
+- IMP-010: Integration test — [scenario] → US-2 AC-1
+
+Each IMP item traces to a User Story (US-N) and optionally an Acceptance Criterion (AC-N).
+
+**Total: N items. Implementation is complete when all items are ✅, ⏭️ (justified), or ➖.**
+
+**Traceability check:** Every AC must have at least one IMP item. If an AC has no IMP items, the plan is incomplete.
+
 ---
 
 ## Red Flags to Avoid in Plans
@@ -208,6 +284,8 @@ Structure plan sections to align with what `/x1-review-plan` will validate:
 - Skipping user acceptance - Leads to rework
 - No error handling strategy - Review will reject
 - Missing success criteria - Can't measure done
+- Missing user stories - Can't trace requirements to implementation
+- No Implementation Checklist - Can't verify completeness
 
 **UI/UX Red Flags:**
 - "Create mode" vs "Edit mode" without specifying if layout differs - Ask first
@@ -220,25 +298,29 @@ Structure plan sections to align with what `/x1-review-plan` will validate:
 ## When Complete
 
 Report:
-- Requirements captured (user stories + acceptance criteria)
+- Problem clearly articulated
+- User stories captured with acceptance criteria
 - Architecture approach approved by user
 - Files to create/modify identified
 - Code snippets aligned with codebase (if detailed plan)
+- Implementation Checklist with numbered IMP-NNN items
 
 **Next step:** `/x1-review-plan` to validate before implementation
 
 ---
 
-## Congruence with x1-review-plan
+## Congruence with X1 Workflow
 
-This plan output is structured so `/x1-review-plan` can validate:
+This plan output is structured so downstream skills can validate:
 
-| Plan Section | Review Checklist |
+| Plan Section | Downstream Skill |
 |--------------|------------------|
-| User Stories + Acceptance Criteria | Requirements Coverage |
-| Architecture Approach + Layer Placement | Architecture Compliance |
-| Database + API + Error Handling | Technical Design Quality |
-| UI/UX Design (layout, unity, modes) | UI/UX Design Clarity |
-| Auth + Multi-tenancy | Security & Authorization |
-| Files to Create/Modify | File Organization |
-| Edge Cases | Chaos Demon "What If" |
+| User Stories + Acceptance Criteria | `/x1-review-plan` Requirements Coverage |
+| Architecture Approach + Layer Placement | `/x1-review-plan` Architecture Compliance |
+| Database + API + Error Handling | `/x1-review-plan` Technical Design Quality |
+| UI/UX Design (layout, unity, modes) | `/x1-review-plan` UI/UX Design Clarity |
+| Auth + Multi-tenancy | `/x1-review-plan` Security & Authorization |
+| Files to Create/Modify | `/x1-review-plan` File Organization |
+| Edge Cases | `/x1-review-plan` Chaos Demon "What If" |
+| Implementation Checklist (IMP items) | `/x1-implement` Completion Gate |
+| Implementation Checklist (IMP items) | `/x1-audit-plan` Gap Analysis |

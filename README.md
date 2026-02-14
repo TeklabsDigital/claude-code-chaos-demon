@@ -32,9 +32,15 @@ Skills are invoked in Claude Code using slash commands (e.g., `/x1-plan`).
 
 | Command | Description |
 |---------|-------------|
-| `/x1-plan` | Create an implementation plan with requirements gathering, codebase investigation, and iterative refinement |
+| `/x1-plan` | Problem discovery, user stories, high-level plan, then detailed plan with traceable Implementation Checklist |
 | `/x1-review-plan` | Validate an implementation plan using Chaos Demon methodology before coding begins |
-| `/x1-imp-plan-review` | Comprehensive implementation plan QA template with detailed checklists |
+
+### Implementation
+
+| Command | Description |
+|---------|-------------|
+| `/x1-implement` | Implement from approved plan with completeness tracking and blocking completion gate |
+| `/x1-audit-plan` | Post-implementation gap analysis — verify 100% plan coverage |
 
 ### Code Review
 
@@ -68,13 +74,14 @@ Skills are invoked in Claude Code using slash commands (e.g., `/x1-plan`).
 A typical development workflow using these commands:
 
 ```
-1. /x1-plan          → Gather requirements, investigate codebase, create plan
+1. /x1-plan          → Discover problem, user stories, high-level plan, then detailed plan with Implementation Checklist
 2. /x1-review-plan   → Validate plan with Chaos Demon methodology
-3. [implement]       → Write the code
-4. /x1-code-review   → Review implementation for bugs and issues
-5. /x1-review-tests  → Review or generate tests
-6. /x1-review-git    → Final review of all changes
-7. /x1-git-commit    → Commit with proper message
+3. /x1-implement     → Implement with completeness tracking + completion gate
+4. /x1-audit-plan    → Verify 100% plan coverage (safety net — should find 0 gaps)
+5. /x1-code-review   → Review implementation for bugs and issues
+6. /x1-review-tests  → Review or generate tests
+7. /x1-review-git    → Final review of all changes
+8. /x1-git-commit    → Commit with proper message
 ```
 
 Use `/x1-git-hold` at the start of a session to prevent accidental commits until you're ready.
