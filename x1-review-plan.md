@@ -2,6 +2,16 @@
 
 **Report:** "Using X1 Implementation Plan QA methodology to validate the plan."
 
+## X1 Core Principles (Apply Throughout)
+- **Fail fast:** Throw on missing config. No fallbacks that hide failures.
+- **Verify before assuming:** Read actual method signatures, field names, constructors from the codebase before writing code snippets.
+- **Reuse before creating:** Search the codebase for existing services, DTOs, and patterns before proposing new ones. Extend, don't duplicate.
+- **Minimal pragmatic code:** Generate the minimum code that fully satisfies all acceptance criteria. No more, no less.
+- **Full traceability:** US -> AC -> IMP -> Test. Every link visible, every AC covered.
+- **User stories first:** Requirements are locked before technical investigation begins.
+- **Observable:** Every feature must answer "How will we know this is broken in production?"
+- **Testable by design:** Structure code so orchestration-level tests with mocked boundaries can verify real workflows.
+
 ## Instructions
 
 1. Identify the implementation plan file (ask if unclear)
@@ -148,6 +158,22 @@ MISSING: try/catch, fallback behavior, logging, retry policy
 - Auth requirements specified
 - Role-based access configured
 - Multi-tenancy isolation addressed
+
+### Plan Quality Gates (NEW)
+- [ ] User Story Workshop gate passed: ALL stories approved before codebase investigation
+- [ ] API Verification: All code snippets cite actual method signatures with file:line references
+- [ ] Snippet confidence: All snippets marked [VERIFIED] or [CONCEPTUAL]
+- [ ] Fail-fast: No fallback patterns in code snippets (no `?? default`, no silent catch)
+- [ ] Traceability matrix present: Every AC has IMP items, test coverage visible
+- [ ] GAP justifications: Each untested AC has a specific technical reason and alternative verification
+- [ ] Code reuse: Every new class/file justifies why existing code cannot serve the purpose
+- [ ] Repository performance: New repo methods specify access pattern, cardinality, projection needs
+
+### [CONCEPTUAL] Snippet Verification
+For every snippet marked [CONCEPTUAL] in the plan:
+1. Read the actual codebase to verify assumptions
+2. Promote to [VERIFIED] if correct, or flag as BLOCKER if wrong
+3. If >50% of snippets are [CONCEPTUAL], the plan needs more investigation before review can proceed
 
 ### UI/UX Design Clarity (if plan involves frontend)
 - **Visual Unity Verified**: Multiple modes (create/edit, view/edit) explicitly share same layout, or differences are intentional with documented reasons

@@ -23,6 +23,8 @@ Ask: **"Review existing tests OR generate new test plan?"**
 - Test names describe what is being tested
 - Edge cases covered (null, empty, boundary values)
 - No flaky tests (random failures)
+- Tests trace to user stories via `[Trait("UserStory", "US-N")]` attributes
+- Every AC from the plan has at least one test, or a documented justification for why not
 
 ---
 

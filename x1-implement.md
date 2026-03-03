@@ -46,6 +46,7 @@ For each IMP item:
 - Do NOT skip items silently. If an item cannot be implemented, mark it ⏭️ Skipped with a justification and **inform the user immediately**
 - Do NOT batch — complete each item before starting the next
 - Update progress after EVERY item: "Completed IMP-003 (5/47)"
+- When implementing test IMP items, ensure each test has `[Trait("UserStory", "US-N")]` as specified in the plan
 
 ---
 

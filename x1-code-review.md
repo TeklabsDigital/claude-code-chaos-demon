@@ -2,6 +2,16 @@
 
 **Report:** "Using X1 Code Review methodology."
 
+## X1 Core Principles (Apply Throughout)
+- **Fail fast:** Throw on missing config. No fallbacks that hide failures.
+- **Verify before assuming:** Read actual method signatures, field names, constructors from the codebase before writing code snippets.
+- **Reuse before creating:** Search the codebase for existing services, DTOs, and patterns before proposing new ones. Extend, don't duplicate.
+- **Minimal pragmatic code:** Generate the minimum code that fully satisfies all acceptance criteria. No more, no less.
+- **Full traceability:** US -> AC -> IMP -> Test. Every link visible, every AC covered.
+- **User stories first:** Requirements are locked before technical investigation begins.
+- **Observable:** Every feature must answer "How will we know this is broken in production?"
+- **Testable by design:** Structure code so orchestration-level tests with mocked boundaries can verify real workflows.
+
 ## Purpose
 
 This checklist is used for:
@@ -99,6 +109,9 @@ Review in this priority: **Security → Critical bugs → Architecture → Perfo
 - Catch blocks returning empty/default instead of propagating
 - "Safe" wrappers that swallow exceptions
 - Fix: Fail fast. Let errors surface. Handle at appropriate boundary only.
+- **This is enforced during planning too.** See x1-plan "Fail-Fast (MANDATORY)" in Code Snippet Rules.
+- During code review, treat ANY `?? defaultValue` for config/required data as Critical severity.
+- Fallback patterns are the #1 source of silent production bugs.
 
 **Error Handling**
 - Failing open (errors allow access/action instead of denying)
@@ -108,15 +121,28 @@ Review in this priority: **Security → Critical bugs → Architecture → Perfo
 ### Warning (Should Fix)
 
 **Architecture - Layer Separation (CRITICAL)**
-- **Controllers calling repositories directly** - Controllers must NEVER inject or call repositories
-- **Business logic in controllers** - Move ALL logic beyond request/response handling to services
+
+**Service Layer Hierarchy:**
+```
+Controllers / Hubs          -> HTTP endpoints, WebSocket/SignalR handlers. Lightweight. No business logic.
+  | calls
+Orchestration Services       -> Coordinate multi-step workflows. Named *Orchestrator.
+  | calls
+Business Services            -> Single-responsibility domain logic.
+  | calls
+Technical Services           -> Infrastructure concerns (email, SMS, scheduling, caching).
+  | calls
+Repositories                 -> Data access abstraction. Never called from controllers/hubs.
+  | calls
+DbContext                    -> EF Core. Never injected above the repository layer.
+```
+
+- **Controllers/Hubs calling repositories directly** - Controllers and SignalR hubs must NEVER inject or call repositories
+- **Business logic in controllers/hubs** - Move ALL logic beyond request/response handling to services
 - **DbContext/data access in services** - Services must use repositories, not DbContext directly
 - **Data transformation in controllers** - Mapping, filtering, aggregation belongs in services
-
-```
-CORRECT: Controller → Service → Repository → DbContext
-         (HTTP only)  (Logic)   (Data Access)
-```
+- **Skipping service tiers** - Controllers should call orchestrators, not technical services directly (exceptions must be minimal and justified)
+- **External services without provider abstraction** - If an external service (LLM, voice, payment, etc.) could have multiple implementations, it MUST go through a provider interface. Check if one exists before approving direct integration.
 
 - Missing tenant isolation checks
 - DI registration issues (wrong lifetime, missing registration)
@@ -320,6 +346,9 @@ For each issue:
 | Business logic in controller | Untestable, not reusable | Move to service class |
 | DbContext in service | Service doing repository's job | Create repository for data access |
 | Data transformation in controller | Violates single responsibility | Move to service |
+| Controller calls technical service | Skips orchestration layer | Route through orchestrator |
+| Direct external API call | No provider abstraction | Create or use existing provider interface |
+| Business logic in SignalR hub | Hub doing service's job | Delegate to orchestrator/service |
 
 ### External API Error Handling
 | Pattern | Risk | Fix |
@@ -337,6 +366,20 @@ For each issue:
 | Multiple enumerations | CPU: re-iterates collection | Cache with `.ToList()` first |
 | String concat in loop | O(n²) allocations | `StringBuilder` or `string.Join()` |
 | Loading entire table | Memory + I/O | Filter in DB, select needed columns |
+
+**Repository Performance (WARNING -> CRITICAL based on data volume)**
+
+| Code Pattern | Problem | Fix |
+|---|---|---|
+| `ToListAsync()` without pagination | Unbounded result set | Add pagination or verify bounded by other means |
+| `.ToList().Where(...)` | Client-side filtering | Push Where into IQueryable before materialization |
+| Query inside foreach/for loop | N+1 queries (O(N) round-trips) | Batch lookups before the loop |
+| `Count() > 0` | Full count when only existence needed | Use `AnyAsync()` |
+| Missing AsNoTracking on read path | 30-40% unnecessary overhead | Add `.AsNoTracking()` |
+| Include with multiple collections | Cartesian explosion | Use `.AsSplitQuery()` or projection |
+| Missing FK index in configuration | Full table scan on JOIN | Add `.HasIndex()` in entity configuration |
+| Loading full entity for 2-3 fields | Excessive data transfer | Use projection (`.Select(x => new { ... })`) |
+| Sync database call (e.g. `ToList()`) | Blocks thread pool thread | Use async variant (`ToListAsync()`) |
 
 ### React/TypeScript
 | Pattern | Risk | Fix |

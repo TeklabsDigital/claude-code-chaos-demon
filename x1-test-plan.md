@@ -57,6 +57,19 @@ Example:
 [For each success criterion, define how you'll verify it]
 ```
 
+### User Story Traceability (MANDATORY)
+Every test case designed in this plan MUST trace to a user story and acceptance criterion.
+
+Test IDs should include the US reference: `US1-AC1-001` or document the mapping in the test metadata section.
+
+```csharp
+[Trait("UserStory", "US-1")]
+[Fact]
+public async Task MethodName_Scenario_ExpectedBehavior()
+```
+
+If a test doesn't trace to any AC, question whether it's needed. If an AC has no test, justify why.
+
 **Out of Scope** (won't test):
 ```
 [Explicitly list what you're NOT testing and why]
