@@ -88,6 +88,14 @@ If a test doesn't trace to any AC, question whether it's needed. If an AC has no
 | UI Components | | | | | |
 | ETL/Classification | | | | | |
 
+**MANDATORY rows — required when applicable:**
+
+| Component | Mandatory When | Test Approach |
+|-----------|----------------|---------------|
+| Orchestrator (business logic) | Any AC involving business rules | Real orchestrator + real in-memory DB, called directly (not via HTTP). No mock on the orchestrator itself. |
+| Tool + InstanceManager + Repository | Any AC involving agent tools, memory, or scheduling | Full internal workflow: real tool, real AgentInstanceManager, real repository, in-memory DB |
+| Background services | Any AC involving scheduled events or queued processing | Direct invocation of evaluation logic (requires testable seam — see Mock Scope Rules below) |
+
 **Coverage Gaps** (identified areas with insufficient testing):
 ```
 [List any components or scenarios that lack adequate test coverage]
@@ -315,7 +323,75 @@ Example:
 
 ---
 
-## 3. Test Case Design Examples: Unit Tests 🧪
+### 2.8 Scope Invariant Tests (MANDATORY for features with scoped identifiers)
+
+**Principle**: Any feature that passes scope identifiers (instanceId, conversationId, tenantId, contactId) between services must prove isolation holds at every seam. Scoping bugs are privacy violations and data leaks — they pass all happy-path tests while silently corrupting data.
+
+**When to apply**: Any feature involving agent instances, conversations, tenant-filtered queries, or per-user/per-contact data.
+
+**Required test categories:**
+
+| Test ID | Invariant | Scenario | Expected Behavior | Failure Mode |
+|---------|-----------|----------|-------------------|--------------|
+| SCOPE-001 | Conversation isolation | Two instances of same agent, each with own conversation — store data under A, read via B | B cannot see A's data | Scope ID silently becomes null, returns all data |
+| SCOPE-002 | Null scope fail-safe | Scope ID lookup returns null (instance evicted, race condition, wrong ID) | Fail with error, NOT return all data | Silent null coalesce exposes all records |
+| SCOPE-003 | Cross-tenant isolation | Same entity IDs, different tenantIds | Tenant B cannot see Tenant A's data even if IDs match | Missing WHERE tenantId clause |
+| SCOPE-004 | Stale reference | Scope ID exists in one service (e.g., in-memory manager) but not another (DB) — or vice versa | Consistent behavior: fail or degrade gracefully, no partial data | In-memory state diverges from DB, one service sees data the other doesn't |
+| SCOPE-005 | Scope propagation | Scope ID passed through chain: Controller → Orchestrator → Tool → Repository | Each layer receives and forwards the same scope ID unchanged | ID lost or overwritten at any seam |
+
+**Test pattern for scope isolation:**
+```csharp
+// RED test first (MANDATORY): write this assertion, run it, confirm it FAILS
+// This proves the test can detect a real scoping bug
+instanceB_result.Should().Contain(instanceA_data);  // This MUST fail
+
+// Then write the correct assertion:
+instanceB_result.Should().NotContain(instanceA_data);  // This MUST pass
+```
+
+**Specific Scope Invariants** (from implementation):
+```
+[For each scoped feature, list the scope identifiers and what data they protect]
+
+Example (agent memory):
+- Scope: AgentConversationId (from AgentInstance.AgentConversationId)
+- Protected: AgentMemoryItem records
+- SCOPE-001: Instance A stores memory → Instance B (same agent, diff conversation) cannot retrieve it
+- SCOPE-002: AgentInstanceManager.GetInstance() returns null → AgentMemoryTool returns error, not all memories
+- SCOPE-003: tenantId=1 memories invisible to tenantId=2, even if AgentDefinitionId matches
+```
+
+---
+
+## 3. Mock Scope Rules (MANDATORY — read before writing any test)
+
+**Rule**: Mock ONLY at true system boundaries. Never mock internal seams when the goal is to test business logic.
+
+| Boundary type | Mock? | Reason |
+|--------------|-------|--------|
+| LLM providers (OpenAI, Anthropic) | YES | External, non-deterministic, costly |
+| Email providers, IMAP/SMTP | YES | External I/O |
+| External HTTP APIs | YES | External, unreliable in tests |
+| `IClock` / time | YES | Makes tests deterministic |
+| `AgentInstanceManager` | **NO** | Core business logic; mocking it hides scope bugs |
+| Repositories | **NO** (use in-memory DB) | EF queries must be exercised |
+| Orchestrators (in controller tests) | YES | Controller tests verify HTTP contract only |
+| Orchestrators (in orchestrator tests) | **NO** | Orchestrator tests verify business logic |
+
+**Controller tests vs Orchestrator tests — both are required, both are correct:**
+- `SomeFeatureControllerTests`: Mocks orchestrator. Proves HTTP routing, auth, response shape.
+- `SomeFeatureOrchestratorTests`: No HTTP, real orchestrator, real in-memory DB. Proves business logic.
+
+**False confidence gate (MANDATORY):**
+Before finalizing the test plan, for at least one scope-sensitive test:
+1. Write the assertion wrong (e.g., assert instance B CAN see instance A's memory)
+2. Run it — it MUST fail
+3. Fix the assertion
+4. If you cannot make a test fail by asserting wrong behavior, the test is not detecting real bugs — rethink the test
+
+---
+
+## 3a. Test Case Design Examples: Unit Tests 🧪
 
 All tests and scenarios here are examples.
 
@@ -518,6 +594,40 @@ Example:
   - Test: Correctly maps order data to AI API format
 - LoadService: Saves classification results
   - Test: Saves to Classification, ClassificationAudit, and ClassificationAuditDetails tables
+```
+
+---
+
+### 4.4 Internal Workflow Integration Tests (MANDATORY for agent/tool/instance features)
+
+**Purpose**: Test complete internal workflows that span multiple services with scoped identifiers. These tests do NOT go through HTTP. They instantiate real services directly, wire them together, and assert observable side-effects (DB state, tool results).
+
+**Setup**: In-memory `WorkyBotDbContext` (via `CustomWebApplicationFactory` service scope or direct `DbContextOptionsBuilder`), real `AgentInstanceManager` (singleton in-process), real tool implementations.
+
+**PREREQUISITE for background service tests**: Hosted services (e.g., `ScheduleEvaluationService`) must expose a testable seam before tests can be written:
+- Option A: Extract evaluation logic into `EvaluateAsync(DateTimeOffset now)` that tests call directly
+- Option B: Inject `IClock` and advance it in tests
+- If neither exists: add the seam as a production code change BEFORE writing the test
+
+**Required test cases for agent instance features:**
+
+| Test ID | Workflow | Services Involved | Observable Assertion |
+|---------|----------|-------------------|---------------------|
+| IWF-001 | Memory isolation between conversations | AgentMemoryTool + AgentInstanceManager + AgentMemoryItemRepository | Instance B cannot retrieve memory stored by Instance A (same agent, different AgentConversationId) |
+| IWF-002 | Null scope fail-safe for memory | AgentMemoryTool + AgentInstanceManager | GetInstance() returning null results in error ToolResult, not empty-scope query returning all data |
+| IWF-003 | Scheduler creates with correct conversation binding | AgentSchedulerTool + AgentInstanceManager + ScheduleRepository | AgentSchedule.AgentConversationId matches caller instance's AgentConversationId |
+| IWF-004 | Scheduler list isolation between conversations | AgentSchedulerTool + AgentInstanceManager + ScheduleRepository | Instance B's ListSchedules does not include Instance A's conversation-bound schedules |
+| IWF-005 | Schedule fire resolves to correct instance | ScheduleEvaluationService (direct invocation) + ScheduleRepository + AgentInstanceManager | Due schedule fires, LastFiredAt set, correct AgentDefinitionId+AgentConversationId targeted |
+| IWF-006 | Cross-tenant isolation | Any repository + WorkyBotDbContext | tenantId=1 data invisible to tenantId=2 even when other IDs match |
+
+**Specific Internal Workflow Tests**:
+```
+[For each feature involving agent instances, tools, or background services, list the internal workflows to test]
+
+Example (agent memory feature):
+- IWF-001: Store memory via Instance A → recall via Instance B → assert not found
+- IWF-002: Remove Instance A from AgentInstanceManager → recall via Instance A's instanceId → assert ToolResult.IsError = true
+- IWF-006: Seed memories for tenantId=1 → query with tenantId=2 → assert empty result
 ```
 
 ---

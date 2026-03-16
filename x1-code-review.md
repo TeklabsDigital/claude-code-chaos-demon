@@ -144,6 +144,13 @@ DbContext                    -> EF Core. Never injected above the repository lay
 - **Skipping service tiers** - Controllers should call orchestrators, not technical services directly (exceptions must be minimal and justified)
 - **External services without provider abstraction** - If an external service (LLM, voice, payment, etc.) could have multiple implementations, it MUST go through a provider interface. Check if one exists before approving direct integration.
 
+**Design Elegance**
+- **Constructor dependency count >5** - Service is doing too much. Should be split into focused services that compose. Count the parameters; if the test setup needs >5 mocks, the design is wrong.
+- **Mixing decisions with side effects** - A method that both evaluates a condition (should we suspend? is the threshold breached?) AND executes the result (update database, call another service) should be split. Decisions should be pure or near-pure; execution should be separate. This makes the decision logic trivially testable.
+- **Policy logic embedded in orchestration** - Threshold checks, eligibility rules, scheduling decisions embedded inside lifecycle methods. Extract to dedicated policy/guard services or pure functions.
+- **Seam assumptions undocumented** - Service A calls Service B and assumes B's state. If the assumption is not validated (check return value, verify precondition), flag it. Silent assumptions at service boundaries become production bugs.
+
+**Tenant & DI**
 - Missing tenant isolation checks
 - DI registration issues (wrong lifetime, missing registration)
 
@@ -349,6 +356,15 @@ For each issue:
 | Controller calls technical service | Skips orchestration layer | Route through orchestrator |
 | Direct external API call | No provider abstraction | Create or use existing provider interface |
 | Business logic in SignalR hub | Hub doing service's job | Delegate to orchestrator/service |
+
+### Design Elegance
+| Pattern | Risk | Fix |
+|---------|------|-----|
+| Service constructor >5 dependencies | Doing too much, hard to test | Split into focused services that compose |
+| Method decides AND executes | Untestable decision logic | Separate decision (pure) from execution (side effects) |
+| Policy logic inside orchestrator | Guards/rules buried in workflow | Extract to dedicated guard/policy service or pure function |
+| Unchecked cross-service assumption | Silent seam failure in production | Validate state at handoff point (check return, verify precondition) |
+| Test needs >5 mocks | Design smell, not test smell | Redesign service, don't write complex test setup |
 
 ### External API Error Handling
 | Pattern | Risk | Fix |

@@ -25,6 +25,9 @@ Ask: **"Review existing tests OR generate new test plan?"**
 - No flaky tests (random failures)
 - Tests trace to user stories via `[Trait("UserStory", "US-N")]` attributes
 - Every AC from the plan has at least one test, or a documented justification for why not
+- **Mock scope is correct**: orchestrators are only mocked in controller tests; internal seams use real implementations
+- **Scope invariants tested**: if the feature involves scoped IDs (instanceId, conversationId, tenantId), isolation tests exist
+- **False confidence check**: at least one test was verified to fail when given wrong inputs/assertions (no tests pass trivially because mocks return expected values)
 
 ---
 
@@ -74,6 +77,42 @@ Ask: **"Review existing tests OR generate new test plan?"**
 - Partial batch failures
 - Transaction rollbacks
 
+### Scope Invariants (MANDATORY for features with scoped identifiers)
+Apply when the feature involves instanceId, conversationId, tenantId, contactId, or any other scoping identifier passed between services.
+
+- **Isolation**: Two entities with same parent scope (same agent, different conversations) cannot see each other's data. Test by storing under A, reading via B, asserting not found.
+- **Null scope fail-safe**: When scope ID lookup fails (instance evicted, race condition, wrong ID), system returns an error — NOT all data for that scope level. A silent null coalesce is a privacy leak.
+- **Cross-tenant**: Different tenantIds cannot access each other's data even when other IDs match.
+- **Stale reference**: Scope ID exists in one service (e.g., in-memory manager) but not another (DB). Behavior must be consistent — fail or degrade, never silently return wrong data.
+
+**False confidence gate**: For each scope invariant test, first write the assertion wrong (assert isolation is broken), run it, confirm it fails. Then fix the assertion. If you cannot make it fail, the test is not detecting real bugs.
+
+## Mock Scope Rules (MANDATORY)
+
+Mock ONLY at true system boundaries. Never mock internal seams when testing business logic.
+
+| Boundary | Mock? |
+|----------|-------|
+| LLM providers, email providers, external HTTP | YES |
+| `IClock` / time | YES |
+| `AgentInstanceManager` | NO — mocking it hides scope bugs |
+| Repositories | NO — use in-memory DB to exercise EF queries |
+| Orchestrators (in **controller** tests) | YES — controller tests verify HTTP contract only |
+| Orchestrators (in **orchestrator** tests) | NO — these tests verify business logic |
+
+Controller tests and orchestrator tests coexist as separate test classes. Both are required.
+
+## Test Layers Required
+
+| Layer | Test approach | When required |
+|-------|--------------|---------------|
+| Controller | HTTP test, mock orchestrator | Always |
+| Orchestrator | Real orchestrator + in-memory DB, called directly | Any AC with business logic |
+| Tool + InstanceManager + Repository | Real services wired together, in-memory DB | Any AC involving agent tools, memory, or scheduling |
+| Background services | Direct invocation of evaluation method (requires testable seam) | Any AC involving scheduled events or queued processing |
+
+**Background service prerequisite**: Hosted services must expose a testable seam (`EvaluateAsync(DateTimeOffset now)` or injected `IClock`) before tests can be written. If the seam doesn't exist, add it as a production code change first.
+
 ## Test Case Template
 
 ```csharp
@@ -99,6 +138,7 @@ public async Task MethodName_Scenario_ExpectedBehavior()
 - Never write tests that accommodate bugs
 - Tests should EXPOSE bugs, not work around them
 - Aim for 80%+ coverage on critical paths
+- If every test passes on first run without any real logic exercised, that is a warning — verify tests can fail by testing wrong behavior
 
 ## Final Report
 

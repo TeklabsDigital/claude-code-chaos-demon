@@ -103,6 +103,41 @@ CHAOS DEMON ASKS:
 - Are API errors logged with status code, reason phrase, and response body?
 ```
 
+### Seam Stress Testing (MANDATORY)
+
+**The reviewer MUST verify that the plan's architecture has been stress tested at the seams, where services hand off to each other.**
+
+Individual services work well in isolation. The system breaks at integration points. If the plan does not show evidence of architecture stress testing, this is a BLOCKER.
+
+**Verification checklist:**
+1. Does the plan include end-to-end scenarios that cross at least two service boundaries?
+2. For each service interaction, is the state assumption at the handoff documented?
+3. Has the plan considered: temporal collisions (two services acting simultaneously), ordering assumptions (A before B), state assumptions (stale reads)?
+4. If the plan has >2 services that interact, are there scenarios showing what happens when they have conflicting intents (one suspending while another is starting work)?
+5. Has the service decomposition been revised based on stress test findings? (If the architecture is identical to the "obvious first pass", it likely hasn't been stress tested.)
+
+**If stress testing evidence is missing:**
+```
+BLOCKER: ARCHITECTURE NOT STRESS TESTED AT SEAMS
+
+The plan proposes [N] interacting services but includes no scenarios that test
+cross-service state handoffs. Individual services may work in isolation, but
+the system will fail at integration points.
+
+REQUIRED: Add 5-8 end-to-end scenarios crossing service boundaries. For each,
+document: the state at each handoff, what assumptions are being made, and what
+happens if those assumptions are violated.
+```
+
+### Service Design Quality (MANDATORY)
+
+**The reviewer MUST evaluate service decomposition for testability and elegance.**
+
+1. **Constructor dependency count.** Any service with >5 injected dependencies is a design smell. Flag it and ask whether the service should be split.
+2. **Decision/side-effect separation.** Services that both decide ("should this happen?") and execute ("make it happen") are harder to test and harder to reason about. Flag services that mix policy decisions with state mutations.
+3. **Mock count in tests.** If a service's test setup requires >5 mocks, the service is doing too much. This is a signal to split, not a signal to write complex test setup.
+4. **Pure function extraction.** Policy evaluations, validation rules, and threshold checks should be pure functions where possible. Flag any policy logic embedded inside a service method with side effects.
+
 ### Review Output Style
 
 When you find issues, be SPECIFIC and CONCRETE:
@@ -161,6 +196,9 @@ MISSING: try/catch, fallback behavior, logging, retry policy
 
 ### Plan Quality Gates (NEW)
 - [ ] User Story Workshop gate passed: ALL stories approved before codebase investigation
+- [ ] Stress Test gate passed: User stories stress tested with end-to-end scenarios, gaps fed back into ACs
+- [ ] Architecture Stress Test: Service interactions stress tested at seams with cross-boundary scenarios
+- [ ] Service Design Elegance: No service with >5 dependencies, decisions separated from side effects
 - [ ] API Verification: All code snippets cite actual method signatures with file:line references
 - [ ] Snippet confidence: All snippets marked [VERIFIED] or [CONCEPTUAL]
 - [ ] Fail-fast: No fallback patterns in code snippets (no `?? default`, no silent catch)

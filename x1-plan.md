@@ -147,11 +147,50 @@ User stories are the foundation of the entire X1 workflow:
 
 **The user story gate is the foundation of the entire X1 workflow.**
 
+### Stress Test User Stories (BLOCKING GATE)
+
+**After user stories are approved but BEFORE architecture begins, stress test the acceptance criteria with end-to-end scenarios.**
+
+Requirements that look complete in isolation break when composed. The goal is to find gaps in the ACs by running realistic scenarios that cross multiple stories and multiple concerns simultaneously.
+
+**Process:**
+1. For each user story, generate 3-5 stress scenarios that combine multiple ACs, concurrent operations, or edge conditions
+2. Walk each scenario through the acceptance criteria step by step
+3. At each step ask: "Is there an AC that covers what happens here? If not, we have a gap."
+4. Add missing ACs or refine existing ones based on gaps found
+5. Re-present updated stories for approval
+
+**Stress scenario categories:**
+- **Temporal collisions:** Two things happening at the same time (budget hit while agent is mid-call, campaign paused while contact is being added)
+- **State transitions under load:** What happens at boundaries (last contact completes, budget hits exactly 100%, daily limit reached mid-batch)
+- **Failure during multi-step operations:** Operation fails halfway through (instance creation succeeds for 5 of 10 contacts, then fails)
+- **Ordering assumptions:** Does the system assume A happens before B? What if B happens first?
+- **Cascading effects:** Action on entity A triggers changes to entities B, C, D. Are all downstream effects covered by ACs?
+
+**Example:**
+```
+Scenario: "Budget exhausted mid-batch-operation"
+1. System is processing 10 items with a $50 budget
+2. Item 7 completes at $45 total (80% threshold hit)
+   -> AC gap found: what happens at 80%? No AC covers warning behaviour.
+   -> Added AC for threshold warning.
+3. Item 8 costs $8, pushing total to $53 (over budget)
+   -> AC gap found: guard runs post-task, not mid-task. Budget can overshoot.
+   -> Added AC clarifying post-task check semantics and overshoot tolerance.
+4. Guard suspends processing. But item 9 was already in-flight via the scheduler.
+   -> AC gap found: what about in-flight items when processing is suspended?
+   -> Added AC for idempotent suspension (in-flight items complete, no new items start).
+```
+
+**This step typically finds 3-8 missing or imprecise ACs.** These are the ACs that would otherwise become bugs discovered during implementation or, worse, in production.
+
+**Output:** Updated user stories with stress-test-derived ACs marked (e.g. "AC-X.30: Idempotent operations [stress-tested]"). Present for re-approval before proceeding.
+
 ---
 
 ## Phase 2: High-Level Plan
 
-**This phase begins ONLY after the User Story Workshop gate has passed (all user stories approved).**
+**This phase begins ONLY after the User Story Workshop gate AND Stress Test gate have passed.**
 
 Present the approach at a conceptual level. No code. No file paths. Just the shape of the solution.
 
@@ -278,6 +317,69 @@ API Integration Tests -> Full HTTP pipeline with in-memory DB and mocked externa
 - Is there business logic trapped in a handler/hub that should be extracted?
 - What mocks are needed, and do the interfaces already exist?
 - What side effects should the test verify? (e.g. "monologue was appended", "ChannelMessage was created")
+
+### Architecture Stress Testing (MANDATORY)
+
+**After the first-pass architecture is designed, stress test it with end-to-end scenarios before writing code snippets.**
+
+Individual services work well internally. The system breaks at the seams, where services hand off to each other. Stress testing targets these integration points by running scenarios that cross multiple service boundaries simultaneously.
+
+**Process:**
+1. Design the initial service decomposition (first pass)
+2. Generate 5-8 scenarios that cross at least two service boundaries
+3. Walk each scenario through the architecture step by step, tracking state at every handoff point
+4. At each handoff ask: "What is the state assumption here? What if it's wrong?"
+5. Identify seam failures: temporal assumptions, ordering assumptions, state assumptions
+6. Redesign service boundaries based on failures found
+7. Re-run scenarios against the revised architecture
+
+**What to look for at the seams:**
+- **Temporal assumptions:** Service A assumes Service B has finished before it acts. What if B is still in progress?
+- **Ordering assumptions:** The design assumes A fires before B. What if the scheduler triggers B first?
+- **State assumptions:** Service A reads data, then Service B modifies it, then Service A acts on stale data.
+- **Conflicting intents:** Two services are both active with opposing goals (one is suspending, another is starting new work).
+- **Partial completion:** A multi-step operation fails midway. What state are the downstream services left in?
+
+**Example:**
+```
+Architecture: OrderService (lifecycle) + BillingGuard (budget) + Scheduler (dispatch)
+
+Scenario: "Billing threshold hit while scheduler is dispatching next item"
+1. Scheduler evaluates: 3 items due, picks item A, begins dispatch
+2. Meanwhile, item B completes and BillingGuard runs post-completion check
+3. BillingGuard determines budget is exhausted, calls OrderService.Suspend()
+4. OrderService deactivates all schedules
+5. But Scheduler already picked item A in step 1 and is mid-dispatch
+   -> SEAM FAILURE: Scheduler holds a reference to a schedule that was just deactivated
+   -> FIX: Scheduler must check schedule.IsActive before executing, or suspension
+      must be idempotent for in-flight items
+```
+
+**The first-pass architecture is rarely optimal.** Expect to revise service boundaries, split or merge services, and move responsibilities based on what the stress scenarios reveal. This is the cheapest place to make these changes.
+
+### Service Design Elegance (MANDATORY)
+
+The best architecture emerges when testability drives the design. If a service is hard to test, the design is wrong. Do not work around bad design with complex test setup; redesign the service.
+
+**The elegance test: Can someone read the service constructor and immediately understand what it does?**
+
+A service with 8 injected dependencies is a service trying to do too much. Before accepting a service design, challenge it:
+
+1. **Single-axis responsibility.** Each service should have ONE reason to change. If a service handles both lifecycle orchestration AND policy evaluation, split it. Each focused service becomes independently testable with 3-4 mocks.
+
+2. **Dependencies reveal design quality.** Count the constructor parameters. If a service needs >5 dependencies, it is likely doing too much. Challenge: can this be split into focused services that compose?
+
+3. **Decisions as pure functions where possible.** Policy decisions (should this fire? is a threshold exceeded?) are pure logic that takes data in and returns a decision. Extract them from services that have side effects. Pure decision functions are trivially testable without mocks.
+
+4. **Side effects at the edges.** Services that make decisions should not also execute those decisions. A guard service decides "suspend this operation" but delegates to a lifecycle service to do it. This separation means guard logic tests never need to verify database state.
+
+5. **Challenge the initial design.** The first service decomposition is rarely optimal. During planning, propose the initial design, then immediately ask: "If I were writing tests for this, what would be painful?" Painful test setup signals design problems. Redesign before coding.
+
+**During planning, for each new service ask:**
+- How many mocks does the test need? (Target: 3-4. If >5, redesign.)
+- Can the core logic be tested without mocking anything? (Extract pure functions.)
+- Does this service mix decisions with side effects? (Split them.)
+- Would a new developer understand this service's purpose from the constructor alone?
 
 ### API Verification (BLOCKING)
 
